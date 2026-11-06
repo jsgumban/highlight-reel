@@ -1,0 +1,95 @@
+# Which preset's signal weights to use. Override per-run with
+# `select.py --preset NAME` (see the [presets.*] tables below).
+preset = "general"          # default signal weighting; override with --preset
+
+[analysis]
+# Internal audio sample rate (Hz). 22050 gives headroom above the
+# speech band while keeping hour-long decodes cheap.
+sample_rate = 22050
+
+# Scoring resolution (seconds): every signal is aggregated into one
+# score sample per hop. Smaller = finer-grained cut points, more work.
+hop_s = 0.5                 # scoring resolution (one score sample per hop)
+
+# Video is decoded at this fps for motion analysis. 4 fps sees action
+# fine; raise it only if very fast cuts are getting averaged away.
+frame_fps = 4.0             # video decoded at this fps for motion analysis
+
+# Tiny grayscale frames (w, h) for motion diffing. Big enough to see
+# movement, small enough that a 2-hour VOD decodes in seconds.
+frame_size = [160, 90]      # tiny grayscale frames (w, h) for motion diffing
+
+[selection]
+# Aim for this much total highlight footage (seconds). The selector
+# greedily takes the best segments until it gets there. Override
+# per-run with `select.py --target SECONDS`.
+target_total_s = 120        # aim total highlight duration; 0 = keep everything above threshold
+
+# Segment duration bounds (seconds). Shorter candidates expand around
+# their score peak; longer ones get trimmed to it.
+min_clip_s = 4.0
+max_clip_s = 40.0
+
+# Pre/post roll around each segment (seconds), so clips don't open
+# mid-action or cut the reaction short.
+pre_roll_s = 1.5
+post_roll_s = 2.0
+
+# Two excited stretches closer than this collapse into one segment.
+merge_gap_s = 3.0           # score cores closer than this fuse into one segment
+
+# Cut points slide up to this far (seconds) toward the calmest nearby
+# moment. Widen if cuts keep landing mid-sentence.
+boundary_snap_s = 2.0       # search radius to snap cut points into calm moments
+
+# Score percentile that seeds candidate segments. Lower = more
+# sensitive (keeps more footage). Higher = stricter.
+percentile_floor = 80       # score percentile that seeds candidate segments
+
+# Gaussian smoothing of the fused score (seconds). Larger = fewer,
+# longer segments; smaller = choppier and more reactive.
+smooth_s = 2.5              # gaussian smoothing of the fused score
+
+# Per-signal robust z-scores are clipped to [0, z_clip] so one freak
+# spike can't dominate the fusion.
+z_clip = 6.0                # per-signal robust z-scores are clipped to [0, z_clip]
+
+[render]
+# What to emit. Turn clips off if you only want the supercut.
+clips = true
+supercut = true
+
+# false = fast keyframe-snapped stream copy; true = frame-accurate
+# re-encode (much slower, needed only if snap points bother you).
+reencode = false            # false = fast keyframe-snapped stream copy; true = frame-accurate re-encode
+contactsheet = true
+
+# Signal weights per preset. Each weight scales that signal's robust
+# z-score before fusion; 0 removes the signal entirely.
+[presets.general]
+loudness = 1.0
+onset = 1.0
+speech = 0.7
+motion = 1.0
+scenecut = 0.4
+
+[presets.sports]            # crowd/impact-driven: audio bursts + motion
+loudness = 1.2
+onset = 1.2
+speech = 0.4
+motion = 1.0
+scenecut = 0.3
+
+[presets.talk]              # lectures, podcasts, meetings: voice is the signal
+loudness = 0.8
+onset = 0.6
+speech = 1.4
+motion = 0.2
+scenecut = 0.1
+
+[presets.gaming]            # commentary + on-screen action + kill-cam cuts
+loudness = 1.0
+onset = 1.0
+speech = 1.0
+motion = 0.8
+scenecut = 0.5
